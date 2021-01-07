@@ -9,11 +9,13 @@ import itertools
 class ImapArchiver(object):
     """Archives old messages in IMAP mailboxes."""
 
-    def __init__(self, connection, max_age=365):
+    def __init__(self, connection, max_age=365, max_messages=50, archive_mailbox_name="Archives"):
         self.connection = connection
         self.max_age = max_age
-        self.archive_mailboxes = self.get_mailboxes_matching("Archives")
-        self.pattern = re.compile('^[0-9]+ \(UID ([0-9]+) INTERNALDATE "([0-9]+-[a-zA-Z]+-[0-9]+ [0-9]+:[0-9]+:[0-9]+ \+[0-9]+)')
+        self.max_messages = max_messages
+        self.archive_mailbox_name = archive_mailbox_name
+        self.archive_mailboxes = self.get_mailboxes_matching(self.archive_mailbox_name)
+        self.pattern = re.compile('^[0-9]+ \(UID ([0-9]+) INTERNALDATE "([0-9]+-[a-zA-Z]+-[0-9]+ [0-9]+:[0-9]+:[0-9]+ [-\+][0-9]+)')
         self.now = datetime.datetime.now(datetime.timezone.utc)
 
     def archive_mailbox(self, mailbox):
@@ -26,12 +28,14 @@ class ImapArchiver(object):
         if not message_uids:
             return
 
-        messages = self.get_messages(message_uids, mailbox)
-        messages = list(filter(lambda x: x["age"] > self.max_age, messages))
+        for start in range(0, len(message_uids), self.max_messages):
+            message_uid_row = list(message_uids[start:start+self.max_messages])
+            messages = self.get_messages(message_uid_row, mailbox)
+            messages = list(filter(lambda x: x["age"] > self.max_age, messages))
 
-        for archive_mailbox, messages in itertools.groupby(messages, key=lambda x:x["mailbox"]):
-            message_uids = [str(message["uid"]) for message in messages]
-            self.archive_messages(message_uids, mailbox, archive_mailbox)
+            for archive_mailbox, messages in itertools.groupby(messages, key=lambda x:x["mailbox"]):
+                message_uid_row = [message["uid"] for message in messages]
+                self.archive_messages(message_uid_row, mailbox, archive_mailbox)
 
     def archive_messages(self, message_uids, mailbox, archive_mailbox):
         """Move the messages to the new mailbox, creating it if needed"""
@@ -51,25 +55,30 @@ class ImapArchiver(object):
     def build_archive_mailbox(self, date, mailbox):
         """Build the name of the archive mailbox"""
 
-        mailbox_name = "Archives.%d.%s" % (date.year, mailbox)
+        mailbox_name = "%s.%d.%s" % (self.archive_mailbox_name, date.year, mailbox)
         return mailbox_name.replace(".INBOX", "")
 
     def create_archive_mailbox(self, mailbox_name):
         """Create the archive mailbox and add it to the list"""
 
-        self.connection.create(mailbox_name)
+        self.connection.create(self.quote_mailbox(mailbox_name))
         self.archive_mailboxes.append(mailbox_name)
 
     def select_mailbox(self, mailbox):
         """Open the given mailbox in read/write mode"""
 
         try:
-            type = self.connection.select(mailbox, True)[0]
+            type = self.connection.select(self.quote_mailbox(mailbox), True)[0]
         except Exception as e:
             raise Exception("Mailbox selection threw an exception: %s" % e)
 
         if type != "OK":
             raise Exception('Could not select mailbox "%s"' % mailbox)
+
+    def quote_mailbox(self, mailbox_name):
+        """Double quote in case the mailbox includes spaces"""
+
+        return "\"%s\"" % mailbox_name
 
     def get_message_uids(self):
         """Return the UIDs of the messages in the current mailbox"""
