@@ -50,7 +50,7 @@ class ImapArchiver(object):
         type, data = self.connection.uid("move", message_set, self.quote_mailbox(archive_mailbox))
 
         if type != "OK":
-            raise Exception("Failed to move %d messages from %s to %s" % (len(messages), mailbox, archive_mailbox))
+            raise Exception("Failed to move messages from %s to %s" % (mailbox, archive_mailbox))
 
     def build_message_set(self, message_uids):
         """Compress the message UIDs into sets"""
