@@ -107,7 +107,10 @@ class ImapArchiver(object):
         if type != "OK":
             raise Exception('Could not get message IDs from mailbox "%s"' % mailbox)
 
-        return data[0].split()
+        message_uids = list(map(int, data[0].split()))
+        message_uids.sort()
+
+        return message_uids
 
     def get_messages(self, message_uids, mailbox):
         """
@@ -115,7 +118,7 @@ class ImapArchiver(object):
         the mailboxes to store them in
         """
 
-        message_set = b",".join(message_uids).decode("utf-8")
+        message_set = self.build_message_set(message_uids)
 
         type, data = self.connection.uid("fetch", message_set, "(UID INTERNALDATE)")
 
