@@ -150,8 +150,12 @@ class ImapArchiver(object):
         status, mailboxes = self.connection.list(pattern)
 
         for mailbox in mailboxes:
-            mailbox_name = mailbox.decode().split(' "." ')[1]
-            mailbox_names.append(mailbox_name)
+            flags, mailbox_name = mailbox.decode().split(' "." ')
+
+            # Mailboxes with the "Noselect" flag cannot be used
+            if "Noselect" not in flags:
+                mailbox_name = mailbox_name.strip("\"")
+                mailbox_names.append(mailbox_name)
 
         return mailbox_names
 
