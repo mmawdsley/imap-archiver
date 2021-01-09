@@ -31,7 +31,6 @@ class ImapArchiver(object):
         for start in range(0, len(message_uids), self.max_messages):
             message_uid_row = list(message_uids[start:start+self.max_messages])
             messages = self.get_messages(message_uid_row, mailbox)
-            messages = list(filter(lambda x: x["age"] > self.max_age, messages))
 
             for archive_mailbox, messages in itertools.groupby(messages, key=lambda x:x["mailbox"]):
                 message_uid_row = [message["uid"] for message in messages]
@@ -102,7 +101,9 @@ class ImapArchiver(object):
     def get_message_uids(self):
         """Return the UIDs of the messages in the current mailbox"""
 
-        type, data = self.connection.uid("search", None, "ALL")
+        max_date = self.now - datetime.timedelta(days=self.max_age + 1)
+        query = '(BEFORE "%s")' % max_date.strftime("%d-%b-%Y")
+        type, data = self.connection.uid("search", None, query)
 
         if type != "OK":
             raise Exception('Could not get message IDs from mailbox "%s"' % mailbox)
