@@ -111,7 +111,7 @@ class ImapArchiver(object):
         """Return the UIDs of the messages in the current mailbox"""
 
         max_date = self.now - datetime.timedelta(days=self.max_age + 1)
-        query = '(BEFORE "%s")' % max_date.strftime("%d-%b-%Y")
+        query = '(BEFORE "%s" NOT FLAGGED)' % max_date.strftime("%d-%b-%Y")
         type, data = self.connection.uid("search", None, query)
 
         if type != "OK":
